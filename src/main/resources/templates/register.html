@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>DTM — Регистрация</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <link rel="stylesheet" th:href="@{/css/login.css}">
+</head>
+<body class="login-page">
+
+<div class="auth-card">
+    <div class="auth-logo">⬡ DTM</div>
+    <p class="auth-subtitle">Создать аккаунт</p>
+
+    <div id="errorMsg" class="error-msg" style="display:none"></div>
+
+    <div class="form-group">
+        <label class="form-label">Полное имя</label>
+        <input id="fullName" type="text" class="form-control" placeholder="Имя Фамилия">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="email" type="email" class="form-control" placeholder="you@company.com">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Пароль</label>
+        <input id="password" type="password" class="form-control" placeholder="Минимум 6 символов">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Роль</label>
+        <select id="role" class="form-control">
+            <option value="TEAM">Команда</option>
+            <option value="PM">PM</option>
+            <option value="MANAGER">Руководитель</option>
+        </select>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%; justify-content:center; padding:12px"
+            onclick="doRegister()">
+        Зарегистрироваться
+    </button>
+
+    <p class="auth-footer">
+        Уже есть аккаунт? <a href="/login">Войти</a>
+    </p>
+</div>
+
+<script th:src="@{/js/api.js}"></script>
+<script>
+    async function doRegister() {
+      const data = {
+        fullName: document.getElementById('fullName').value,
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        role: document.getElementById('role').value
+      };
+      try {
+        await API.register(data);
+        window.location.href = '/login';
+      } catch(e) {
+        const el = document.getElementById('errorMsg');
+        el.textContent = e.message;
+        el.style.display = 'block';
+      }
+    }
+</script>
+</body>
+</html>

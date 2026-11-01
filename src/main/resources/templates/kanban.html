@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'DTM — ' + ${project.name}">DTM — Kanban</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <link rel="stylesheet" th:href="@{/css/kanban.css}">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <a href="/projects" class="navbar-brand">⬡ DTM</a>
+    <div class="navbar-right">
+        <button class="notif-btn" onclick="toggleNotif()">🔔
+            <span class="notif-badge" th:text="${unreadCount}"
+                  th:style="${unreadCount == 0} ? 'display:none' : ''">0</span>
+        </button>
+        <div class="user-avatar" th:text="${#strings.substring(currentUser.fullName,0,1)}">U</div>
+        <form th:action="@{/logout}" method="post" style="margin:0">
+            <button class="btn btn-ghost btn-sm" type="submit">Выйти</button>
+        </form>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <a href="/projects" class="sidebar-link">📋 Проекты</a>
+        <a href="#" class="sidebar-link active">🗂 Доска</a>
+    </aside>
+
+    <main class="main-content">
+        <!-- Хлебные крошки -->
+        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px">
+            <a href="/projects" style="color:var(--text-dim);text-decoration:none">Проекты</a>
+            / <span th:text="${project.name}"></span>
+        </p>
+
+        <!-- Toolbar -->
+        <div class="kanban-toolbar">
+            <div>
+                <h1 class="page-title" th:text="${project.name}">Проект</h1>
+                <p class="page-sub" th:text="${project.description}"></p>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <!-- Поиск -->
+                <input id="searchInput" class="search-input" placeholder="🔍 Поиск задач..."
+                       oninput="searchTasks(this.value)">
+
+                <!-- Фильтры -->
+                <select class="filter-select" onchange="filterByPriority(this.value)">
+                    <option value="">Все приоритеты</option>
+                    <option th:each="p : ${priorities}" th:value="${p}" th:text="${p}"></option>
+                </select>
+
+                <button class="btn btn-primary" onclick="openCreateTask()">+ Задача</button>
+            </div>
+        </div>
+
+        <!-- Kanban Board -->
+        <div class="kanban-board">
+
+            <!-- Колонка NEW -->
+            <div class="kanban-col">
+                <div class="col-header">
+          <span class="col-title">
+            <span class="col-dot col-dot-new"></span>
+            Новые
+          </span>
+                    <span class="col-count" th:text="${#lists.size(newTasks)}">0</span>
+                </div>
+                <div class="col-body" id="col-NEW"
+                     ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="onDrop(event, 'NEW')">
+                    <div th:each="task : ${newTasks}"
+                         th:id="'task-' + ${task.id}"
+                         class="task-card"
+                         draggable="true"
+                         th:ondragstart="|dragStart(event, ${task.id})|">
+                        <div class="task-card-top">
+              <span class="task-title">
+                <a th:href="@{/tasks/{id}(id=${task.id})}"
+                   th:text="${task.title}">Задача</a>
+              </span>
+                            <span th:class="'priority priority-' + ${task.priority}"
+                                  th:text="${task.priority}">LOW</span>
+                        </div>
+                        <div class="task-tags">
+              <span th:each="tt : ${task.tags}"
+                    class="tag-chip"
+                    th:text="${tt.tag.name}">Tag</span>
+                        </div>
+                        <div class="task-card-footer">
+                            <div class="task-assignees">
+                                <div th:each="a, iter : ${task.assignees}"
+                                     th:if="${iter.index < 3}"
+                                     class="assignee-dot"
+                                     th:text="${#strings.substring(a.user.fullName, 0, 1)}"
+                                     th:title="${a.user.fullName}">A</div>
+                            </div>
+                            <span th:class="${task.overdue} ? 'task-due overdue' : 'task-due'">
+                <span th:if="${task.overdue}" class="overdue-dot"></span>
+                <span th:text="${task.dueDate != null ? task.dueDate : '—'}"></span>
+              </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Колонка IN_PROGRESS -->
+            <div class="kanban-col">
+                <div class="col-header">
+          <span class="col-title">
+            <span class="col-dot col-dot-prog"></span>
+            В работе
+          </span>
+                    <span class="col-count" th:text="${#lists.size(inProgress)}">0</span>
+                </div>
+                <div class="col-body" id="col-IN_PROGRESS"
+                     ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="onDrop(event, 'IN_PROGRESS')">
+                    <div th:each="task : ${inProgress}"
+                         th:id="'task-' + ${task.id}"
+                         class="task-card"
+                         draggable="true"
+                         th:ondragstart="|dragStart(event, ${task.id})|">
+                        <div class="task-card-top">
+              <span class="task-title">
+                <a th:href="@{/tasks/{id}(id=${task.id})}"
+                   th:text="${task.title}">Задача</a>
+              </span>
+                            <span th:class="'priority priority-' + ${task.priority}"
+                                  th:text="${task.priority}">MEDIUM</span>
+                        </div>
+                        <div class="task-tags">
+              <span th:each="tt : ${task.tags}" class="tag-chip"
+                    th:text="${tt.tag.name}">Tag</span>
+                        </div>
+                        <div class="task-card-footer">
+                            <div class="task-assignees">
+                                <div th:each="a, iter : ${task.assignees}"
+                                     th:if="${iter.index < 3}"
+                                     class="assignee-dot"
+                                     th:text="${#strings.substring(a.user.fullName,0,1)}"
+                                     th:title="${a.user.fullName}">A</div>
+                            </div>
+                            <span th:class="${task.overdue} ? 'task-due overdue' : 'task-due'">
+                <span th:if="${task.overdue}" class="overdue-dot"></span>
+                <span th:text="${task.dueDate != null ? task.dueDate : '—'}"></span>
+              </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Колонка REVIEW -->
+            <div class="kanban-col">
+                <div class="col-header">
+          <span class="col-title">
+            <span class="col-dot col-dot-rev"></span>
+            На проверке
+          </span>
+                    <span class="col-count" th:text="${#lists.size(review)}">0</span>
+                </div>
+                <div class="col-body" id="col-REVIEW"
+                     ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="onDrop(event, 'REVIEW')">
+                    <div th:each="task : ${review}"
+                         th:id="'task-' + ${task.id}"
+                         class="task-card" draggable="true"
+                         th:ondragstart="|dragStart(event, ${task.id})|">
+                        <div class="task-card-top">
+              <span class="task-title">
+                <a th:href="@{/tasks/{id}(id=${task.id})}"
+                   th:text="${task.title}">Задача</a>
+              </span>
+                            <span th:class="'priority priority-' + ${task.priority}"
+                                  th:text="${task.priority}">HIGH</span>
+                        </div>
+                        <div class="task-card-footer">
+                            <div class="task-assignees">
+                                <div th:each="a, iter : ${task.assignees}"
+                                     th:if="${iter.index < 3}"
+                                     class="assignee-dot"
+                                     th:text="${#strings.substring(a.user.fullName,0,1)}"
+                                     th:title="${a.user.fullName}">A</div>
+                            </div>
+                            <span th:class="${task.overdue} ? 'task-due overdue' : 'task-due'">
+                <span th:if="${task.overdue}" class="overdue-dot"></span>
+                <span th:text="${task.dueDate != null ? task.dueDate : '—'}"></span>
+              </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Колонка DONE -->
+            <div class="kanban-col">
+                <div class="col-header">
+          <span class="col-title">
+            <span class="col-dot col-dot-done"></span>
+            Завершено
+          </span>
+                    <span class="col-count" th:text="${#lists.size(done)}">0</span>
+                </div>
+                <div class="col-body" id="col-DONE"
+                     ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="onDrop(event, 'DONE')">
+                    <div th:each="task : ${done}"
+                         th:id="'task-' + ${task.id}"
+                         class="task-card" draggable="true"
+                         th:ondragstart="|dragStart(event, ${task.id})|">
+                        <div class="task-card-top">
+              <span class="task-title">
+                <a th:href="@{/tasks/{id}(id=${task.id})}"
+                   th:text="${task.title}">Задача</a>
+              </span>
+                            <span th:class="'priority priority-' + ${task.priority}"
+                                  th:text="${task.priority}">LOW</span>
+                        </div>
+                        <div class="task-card-footer">
+                            <div class="task-assignees">
+                                <div th:each="a, iter : ${task.assignees}"
+                                     th:if="${iter.index < 3}"
+                                     class="assignee-dot"
+                                     th:text="${#strings.substring(a.user.fullName,0,1)}"
+                                     th:title="${a.user.fullName}">A</div>
+                            </div>
+                            <span class="task-due">
+                <span th:text="${task.dueDate != null ? task.dueDate : '—'}"></span>
+              </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /kanban-board -->
+    </main>
+</div>
+
+<!-- Modal: Создать задачу -->
+<div class="modal-overlay" id="createTaskModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Новая задача</span>
+            <button class="modal-close" onclick="closeModal('createTaskModal')">×</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Название *</label>
+            <input id="tTitle" class="form-control" placeholder="Что нужно сделать?">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Описание</label>
+            <textarea id="tDesc" class="form-control" rows="3"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+                <label class="form-label">Приоритет</label>
+                <select id="tPriority" class="form-control">
+                    <option value="LOW">Низкий</option>
+                    <option value="MEDIUM" selected>Средний</option>
+                    <option value="HIGH">Высокий</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Срок</label>
+                <input id="tDueDate" type="date" class="form-control">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+            <button class="btn btn-ghost" onclick="closeModal('createTaskModal')">Отмена</button>
+            <button class="btn btn-primary" onclick="createTask()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Передаём projectId в JS -->
+<div id="pageData"
+     th:data-project-id="${project.id}"
+     style="display:none"></div>
+
+<script th:src="@{/js/api.js}"></script>
+<script th:src="@{/js/kanban.js}"></script>
+</body>
+</html>

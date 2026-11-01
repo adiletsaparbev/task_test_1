@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'DTM — ' + ${task.title}">DTM — Задача</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <link rel="stylesheet" th:href="@{/css/task-detail.css}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/projects" class="navbar-brand">⬡ DTM</a>
+    <div class="navbar-right">
+        <button class="notif-btn" onclick="toggleNotif()">🔔
+            <span class="notif-badge" th:text="${unreadCount}"
+                  th:style="${unreadCount == 0} ? 'display:none' : ''">0</span>
+        </button>
+        <div class="user-avatar" th:text="${#strings.substring(currentUser.fullName,0,1)}">U</div>
+        <form th:action="@{/logout}" method="post" style="margin:0">
+            <button class="btn btn-ghost btn-sm">Выйти</button>
+        </form>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <a href="/projects" class="sidebar-link">📋 Проекты</a>
+        <a th:href="@{/projects/{id}/board(id=${task.project.id})}"
+           class="sidebar-link">🗂 Доска</a>
+        <a href="#" class="sidebar-link active">📌 Задача</a>
+    </aside>
+
+    <main class="main-content">
+        <!-- Хлебные крошки -->
+        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:16px">
+            <a href="/projects" style="color:var(--text-dim);text-decoration:none">Проекты</a>
+            / <a th:href="@{/projects/{id}/board(id=${task.project.id})}"
+                 style="color:var(--text-dim);text-decoration:none"
+                 th:text="${task.project.name}"></a>
+            / <span th:text="${task.title}"></span>
+        </p>
+
+        <div class="task-detail-layout">
+
+            <!-- ── LEFT ─────────────────────────────────── -->
+            <div>
+                <h1 class="task-main-title" th:text="${task.title}">Название задачи</h1>
+
+                <div class="task-meta-row">
+          <span th:class="'status status-' + ${task.status}"
+                th:text="${task.status}">NEW</span>
+                    <span th:class="'priority priority-' + ${task.priority}"
+                          th:text="${task.priority}">MEDIUM</span>
+                    <span th:if="${task.overdue}" style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--red)">
+            <span class="overdue-dot"></span> Просрочено
+          </span>
+                    <span style="color:var(--text-dim);font-size:.83rem">
+            Срок: <strong th:text="${task.dueDate != null ? task.dueDate : '—'}"></strong>
+          </span>
+
+                    <!-- Кнопки действий -->
+                    <div style="margin-left:auto;display:flex;gap:8px">
+                        <select class="filter-select" onchange="changeStatus(this.value)"
+                                th:value="${task.status}">
+                            <option th:each="s : ${statuses}"
+                                    th:value="${s}"
+                                    th:text="${s}"
+                                    th:selected="${s == task.status}"></option>
+                        </select>
+                        <button class="btn btn-ghost btn-sm" onclick="openEditTask()">✏️ Редактировать</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTask()">🗑 Удалить</button>
+                    </div>
+                </div>
+
+                <!-- Описание -->
+                <p class="task-description" th:text="${task.description != null ? task.description : 'Описание не указано'}"></p>
+
+                <!-- Подзадачи -->
+                <div class="subtasks-section">
+                    <div class="section-title">
+            <span>Подзадачи
+              <span style="color:var(--text-dim);font-weight:400;font-size:.85rem"
+                    id="subtaskProgress">...</span>
+            </span>
+                        <button class="btn btn-ghost btn-sm" onclick="openAddSubtask()">+ Добавить</button>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                    </div>
+
+                    <div id="subtaskList" style="margin-top:12px">
+                        <!-- Загружается через JS -->
+                    </div>
+                </div>
+
+                <!-- Вложения -->
+                <div class="subtasks-section">
+                    <div class="section-title">
+                        <span>Файлы</span>
+                    </div>
+                    <div id="attachmentList"><!-- JS --></div>
+                    <div class="file-upload-area" id="dropZone"
+                         onclick="document.getElementById('fileInput').click()"
+                         ondragover="event.preventDefault()"
+                         ondrop="handleFileDrop(event)">
+                        📎 Перетащите файл или нажмите для загрузки
+                    </div>
+                    <input type="file" id="fileInput" style="display:none"
+                           onchange="uploadFile(this.files[0])">
+                </div>
+
+                <!-- Комментарии -->
+                <div>
+                    <div class="section-title">Комментарии</div>
+                    <div id="commentList"><!-- JS --></div>
+                    <div class="comment-form">
+                        <div class="comment-avatar"
+                             th:text="${#strings.substring(currentUser.fullName,0,1)}">U</div>
+                        <textarea id="commentInput" class="comment-input"
+                                  placeholder="Написать комментарий... (используйте @имя для упоминания)"
+                                  rows="1"
+                                  onkeydown="if(event.ctrlKey&&event.key==='Enter')sendComment()"></textarea>
+                        <button class="btn btn-primary btn-sm" onclick="sendComment()">→</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── RIGHT ─────────────────────────────────── -->
+            <div class="task-sidebar">
+
+                <!-- Исполнители -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Исполнители</div>
+                    <div th:each="a : ${task.assignees}">
+                        <div class="assignee-row">
+                            <div class="user-avatar" style="width:28px;height:28px;font-size:.7rem"
+                                 th:text="${#strings.substring(a.user.fullName,0,1)}">A</div>
+                            <span th:text="${a.user.fullName}"></span>
+                            <span style="margin-left:auto;font-size:.72rem;color:var(--text-dim)"
+                                  th:text="${a.role}">ASSIGNEE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Инфо -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Информация</div>
+                    <div style="font-size:.85rem;line-height:2">
+                        <div style="display:flex;justify-content:space-between">
+                            <span style="color:var(--text-dim)">ПМ</span>
+                            <span th:text="${task.pm?.fullName ?: '—'}"></span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between">
+                            <span style="color:var(--text-dim)">Создана</span>
+                            <span th:text="${task.createdAt != null ? #temporals.format(task.createdAt,'dd.MM.yyyy') : '—'}"></span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between">
+                            <span style="color:var(--text-dim)">Проект</span>
+                            <a th:href="@{/projects/{id}/board(id=${task.project.id})}"
+                               style="color:var(--accent);text-decoration:none;font-size:.83rem"
+                               th:text="${task.project.name}"></a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- История -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">История изменений</div>
+                    <div id="historyList">
+                        <!-- Можно загрузить через JS или передать из контроллера -->
+                        <p style="color:var(--text-dim);font-size:.82rem">Загрузка...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div><!-- /task-detail-layout -->
+    </main>
+</div>
+
+<!-- Передаём taskId в JS -->
+<div id="pageData"
+     th:data-task-id="${task.id}"
+     th:data-project-id="${task.project.id}"
+     style="display:none"></div>
+
+<script th:src="@{/js/api.js}"></script>
+<script th:src="@{/js/task-detail.js}"></script>
+</body>
+</html>
